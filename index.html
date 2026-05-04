@@ -45,11 +45,13 @@
     .good { background: #00ff66; }
     .stopped { background: red; }
     .lagging { background: orange; }
+    .offline { background: #7a00ff; }
 
     .info {
       margin-top: 10px;
       font-size: 14px;
       color: #aaa;
+      line-height: 1.5;
     }
 
     .buttons {
@@ -82,8 +84,8 @@
 <script>
 const DB = "https://master-stream-console-default-rtdb.europe-west1.firebasedatabase.app";
 const container = document.getElementById("courts");
+const OFFLINE_AFTER = 60;
 
-// create UI
 for (let i = 1; i <= 8; i++) {
   container.innerHTML += `
     <div class="court-card">
@@ -94,7 +96,8 @@ for (let i = 1; i <= 8; i++) {
 
       <div class="info">
         Status: <span id="status-${i}">-</span><br>
-        Health: <span id="health-${i}">-</span>
+        Health: <span id="health-${i}">-</span><br>
+        Last update: <span id="age-${i}">-</span>
       </div>
 
       <div class="buttons">
@@ -106,7 +109,6 @@ for (let i = 1; i <= 8; i++) {
   `;
 }
 
-// send command
 async function cmd(court, action) {
   await fetch(`${DB}/commands/court${court}/action.json`, {
     method: "PUT",
@@ -114,23 +116,33 @@ async function cmd(court, action) {
   });
 }
 
-// load status
 async function update() {
   for (let i = 1; i <= 8; i++) {
     try {
       const res = await fetch(`${DB}/status/court${i}.json`);
       const data = await res.json();
 
-      const status = data?.status || "stopped";
-      const health = data?.health || "unknown";
+      let status = data?.status || "stopped";
+      let health = data?.health || "unknown";
+      const lastUpdate = Number(data?.lastUpdate || 0);
+      const now = Math.floor(Date.now() / 1000);
+      const age = lastUpdate ? now - lastUpdate : 9999;
+
+      if (status !== "stopped" && age > OFFLINE_AFTER) {
+        status = "offline";
+        health = "stale";
+      }
 
       document.getElementById(`status-${i}`).innerText = status;
       document.getElementById(`health-${i}`).innerText = health;
+      document.getElementById(`age-${i}`).innerText = lastUpdate ? `${age}s ago` : "-";
 
       const light = document.getElementById(`light-${i}`);
       light.className = "light";
 
-      if (status === "stopped") {
+      if (status === "offline" || health === "stale") {
+        light.classList.add("offline");
+      } else if (status === "stopped") {
         light.classList.add("stopped");
       } else if (health === "good") {
         light.classList.add("good");
@@ -139,7 +151,12 @@ async function update() {
       }
 
     } catch (e) {
-      document.getElementById(`status-${i}`).innerText = "error";
+      document.getElementById(`status-${i}`).innerText = "connection error";
+      document.getElementById(`health-${i}`).innerText = "offline";
+      document.getElementById(`age-${i}`).innerText = "-";
+
+      const light = document.getElementById(`light-${i}`);
+      light.className = "light offline";
     }
   }
 }
