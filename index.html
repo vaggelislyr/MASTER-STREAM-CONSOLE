@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Master Stream Console</title>
+
   <style>
     body {
       margin: 0;
@@ -15,190 +16,137 @@
 
     h1 {
       text-align: center;
-      font-size: 24px;
-      margin: 10px 0 20px;
+      margin-bottom: 20px;
     }
 
     .court-card {
       background: #151515;
       border: 1px solid #2c2c2c;
-      border-radius: 18px;
+      border-radius: 16px;
       padding: 16px;
       margin-bottom: 16px;
-      box-shadow: 0 0 18px rgba(0,0,0,0.45);
     }
 
-    .court-title {
-      font-size: 20px;
-      font-weight: bold;
-      margin-bottom: 12px;
+    .title {
       display: flex;
       align-items: center;
       gap: 10px;
+      font-size: 18px;
+      font-weight: bold;
     }
 
     .light {
-      width: 22px;
-      height: 22px;
+      width: 20px;
+      height: 20px;
       border-radius: 50%;
       background: gray;
-      box-shadow: 0 0 14px gray;
-      display: inline-block;
     }
 
-    .good {
-      background: #00ff66;
-      box-shadow: 0 0 16px #00ff66;
-    }
-
-    .lagging, .retrying, .starting {
-      background: #ffb000;
-      box-shadow: 0 0 16px #ffb000;
-    }
-
-    .frozen, .stopped, .unknown {
-      background: #ff2525;
-      box-shadow: 0 0 16px #ff2525;
-    }
+    .good { background: #00ff66; }
+    .stopped { background: red; }
+    .lagging { background: orange; }
 
     .info {
+      margin-top: 10px;
       font-size: 14px;
       color: #aaa;
-      line-height: 1.6;
-      margin-bottom: 14px;
     }
 
     .buttons {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 8px;
+      margin-top: 12px;
+      display: flex;
+      gap: 6px;
     }
 
     button {
+      flex: 1;
+      padding: 10px;
       border: none;
-      border-radius: 12px;
+      border-radius: 10px;
       color: white;
       font-weight: bold;
-      padding: 13px 8px;
-      font-size: 14px;
     }
 
-    .start { background: #0a8f3c; }
-    .stop { background: #b00020; }
-    .restart { background: #b56b00; }
-
-    #msg {
-      text-align: center;
-      color: #aaa;
-      min-height: 22px;
-      margin-bottom: 14px;
-      font-size: 14px;
-    }
+    .start { background: green; }
+    .stop { background: red; }
+    .restart { background: orange; }
   </style>
 </head>
 
 <body>
-  <h1>Master Stream Console</h1>
-  <div id="msg"></div>
-  <div id="courts"></div>
 
-  <script>
-    const DB_URL = "https://master-stream-console-default-rtdb.europe-west1.firebasedatabase.app";
-    const courtsDiv = document.getElementById("courts");
-    const msg = document.getElementById("msg");
+<h1>Master Stream Console</h1>
 
-    function createCourtCard(court) {
-      return `
-        <div class="court-card" id="court-card-${court}">
-          <div class="court-title">
-            <span id="light-${court}" class="light unknown"></span>
-            Court ${court}
-          </div>
+<div id="courts"></div>
 
-          <div class="info">
-            Status: <span id="status-${court}">loading</span><br>
-            Health: <span id="health-${court}">loading</span><br>
-            Last frame: <span id="frame-${court}">-</span><br>
-            Last update: <span id="update-${court}">-</span>
-          </div>
+<script>
+const DB = "https://master-stream-console-default-rtdb.europe-west1.firebasedatabase.app";
+const container = document.getElementById("courts");
 
-          <div class="buttons">
-            <button class="start" onclick="sendCommand(${court}, 'start')">START</button>
-            <button class="stop" onclick="sendCommand(${court}, 'stop')">STOP</button>
-            <button class="restart" onclick="sendCommand(${court}, 'restart')">RESTART</button>
-          </div>
-        </div>
-      `;
-    }
+// create UI
+for (let i = 1; i <= 8; i++) {
+  container.innerHTML += `
+    <div class="court-card">
+      <div class="title">
+        <div id="light-${i}" class="light"></div>
+        Court ${i}
+      </div>
 
-    for (let i = 1; i <= 8; i++) {
-      courtsDiv.innerHTML += createCourtCard(i);
-    }
+      <div class="info">
+        Status: <span id="status-${i}">-</span><br>
+        Health: <span id="health-${i}">-</span>
+      </div>
 
-    async function sendCommand(court, action) {
-      msg.textContent = Sending ${action} to Court ${court}...;
+      <div class="buttons">
+        <button class="start" onclick="cmd(${i}, 'start')">Start</button>
+        <button class="stop" onclick="cmd(${i}, 'stop')">Stop</button>
+        <button class="restart" onclick="cmd(${i}, 'restart')">Restart</button>
+      </div>
+    </div>
+  `;
+}
 
-      await fetch(${DB_URL}/commands/court${court}/action.json, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(action)
-      });
+// send command
+async function cmd(court, action) {
+  await fetch(`${DB}/commands/court${court}/action.json`, {
+    method: "PUT",
+    body: JSON.stringify(action)
+  });
+}
 
-      msg.textContent = Court ${court}: ${action} sent;
+// load status
+async function update() {
+  for (let i = 1; i <= 8; i++) {
+    try {
+      const res = await fetch(`${DB}/status/court${i}.json`);
+      const data = await res.json();
 
-      setTimeout(() => {
-        msg.textContent = "";
-      }, 1800);
-    }
+      const status = data?.status || "stopped";
+      const health = data?.health || "unknown";
 
-    function setLight(court, status, health) {
-      const light = document.getElementById(light-${court});
+      document.getElementById(`status-${i}`).innerText = status;
+      document.getElementById(`health-${i}`).innerText = health;
+
+      const light = document.getElementById(`light-${i}`);
       light.className = "light";
 
       if (status === "stopped") {
         light.classList.add("stopped");
       } else if (health === "good") {
         light.classList.add("good");
-      } else if (health === "lagging") {
-        light.classList.add("lagging");
-      } else if (health === "frozen") {
-        light.classList.add("frozen");
-      } else if (status === "starting" || status === "retrying") {
-        light.classList.add("starting");
-      } else if (status === "running") {
-        light.classList.add("good");
       } else {
-        light.classList.add("unknown");
+        light.classList.add("lagging");
       }
+
+    } catch (e) {
+      document.getElementById(`status-${i}`).innerText = "error";
     }
+  }
+}
 
-    async function loadStatus() {
-      for (let court = 1; court <= 8; court++) {
-        try {
-          const res = await fetch(${DB_URL}/status/court${court}.json);
-          const data = await res.json();
+setInterval(update, 2000);
+update();
+</script>
 
-          const status = data?.status || "unknown";
-          const health = data?.health || "unknown";
-          const frame = data?.lastFrame || "-";
-          const update = data?.lastUpdate || "-";
-
-          document.getElementById(status-${court}).textContent = status;
-          document.getElementById(health-${court}).textContent = health;
-          document.getElementById(frame-${court}).textContent = frame;
-          document.getElementById(update-${court}).textContent = update;
-
-          setLight(court, status, health);
-
-        } catch (e) {
-          document.getElementById(status-${court}).textContent = "connection error";
-          setLight(court, "unknown", "unknown");
-        }
-      }
-    }
-
-    loadStatus();
-    setInterval(loadStatus, 2000);
-  </script>
 </body>
 </html>
