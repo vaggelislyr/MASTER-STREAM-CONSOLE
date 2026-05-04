@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Master Stream Console</title>
+  <style>
+    body {
+      margin: 0;
+      background: #080808;
+      color: white;
+      font-family: Arial, sans-serif;
+      padding: 18px;
+    }
+
+    .card {
+      max-width: 430px;
+      margin: 0 auto;
+      background: #151515;
+      border-radius: 20px;
+      padding: 20px;
+      border: 1px solid #2b2b2b;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 22px;
+      margin-bottom: 20px;
+    }
+
+    .status {
+      text-align: center;
+      background: #0d0d0d;
+      padding: 18px;
+      border-radius: 16px;
+      margin-bottom: 18px;
+    }
+
+    .light {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+      background: gray;
+      box-shadow: 0 0 15px gray;
+      vertical-align: middle;
+    }
+
+    .good {
+      background: #00ff66;
+      box-shadow: 0 0 18px #00ff66;
+    }
+
+    .lagging, .retrying, .starting {
+      background: #ffb000;
+      box-shadow: 0 0 18px #ffb000;
+    }
+
+    .frozen, .stopped {
+      background: #ff2525;
+      box-shadow: 0 0 18px #ff2525;
+    }
+
+    .title {
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .info {
+      margin-top: 10px;
+      color: #aaa;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    button {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 12px;
+    }
+
+    .start { background: #098f3c; }
+    .stop { background: #b00020; }
+    .restart { background: #b56b00; }
+
+    #msg {
+      text-align: center;
+      color: #aaa;
+      margin-top: 14px;
+      min-height: 20px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1>Master Stream Console</h1>
+
+    <div class="status">
+      <div>
+        <span id="light" class="light stopped"></span>
+        <span id="mainStatus" class="title">Court 8</span>
+      </div>
+
+      <div class="info">
+        Status: <span id="statusText">loading</span><br>
+        Health: <span id="healthText">loading</span><br>
+        Last frame: <span id="frameText">-</span><br>
+        Last update: <span id="updateText">-</span>
+      </div>
+    </div>
+
+    <button class="start" onclick="sendCommand('start')">START COURT 8</button>
+    <button class="stop" onclick="sendCommand('stop')">STOP COURT 8</button>
+    <button class="restart" onclick="sendCommand('restart')">RESTART COURT 8</button>
+
+    <div id="msg"></div>
+  </div>
+
+  <script>
+    const DB_URL = "https://master-stream-console-default-rtdb.europe-west1.firebasedatabase.app";
+
+    async function sendCommand(action) {
+      document.getElementById("msg").textContent = "Sending " + action + "...";
+
+      await fetch(`${DB_URL}/commands/court8/action.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action)
+      });
+
+      document.getElementById("msg").textContent = "Command sent: " + action;
+
+      setTimeout(() => {
+        document.getElementById("msg").textContent = "";
+      }, 1800);
+    }
+
+    async function loadStatus() {
+      try {
+        const res = await fetch(`${DB_URL}/status/court8.json`);
+        const data = await res.json();
+
+        if (!data) return;
+
+        const status = data.status || "unknown";
+        const health = data.health || "unknown";
+        const frame = data.lastFrame || "-";
+        const lastUpdate = data.lastUpdate || "-";
+
+        document.getElementById("statusText").textContent = status;
+        document.getElementById("healthText").textContent = health;
+        document.getElementById("frameText").textContent = frame;
+        document.getElementById("updateText").textContent = lastUpdate;
+
+        const light = document.getElementById("light");
+        light.className = "light";
+
+        if (status === "stopped") {
+          light.classList.add("stopped");
+        } else if (health === "good") {
+          light.classList.add("good");
+        } else if (health === "lagging") {
+          light.classList.add("lagging");
+        } else if (health === "frozen") {
+          light.classList.add("frozen");
+        } else if (status === "starting" || status === "retrying") {
+          light.classList.add("starting");
+        } else {
+          light.classList.add("stopped");
+        }
+
+      } catch (e) {
+        document.getElementById("statusText").textContent = "connection error";
+      }
+    }
+
+    loadStatus();
+    setInterval(loadStatus, 2000);
+  </script>
+</body>
+</html>
